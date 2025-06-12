@@ -43,7 +43,9 @@ Transform your Ubuntu server into a professional 24/7 Lo-Fi streaming station! T
 - **File Upload**: Drag-and-drop or click to upload video/audio files
 - **Smart Selection**: Visual file browser with selection indicators
 - **Video Looping**: Toggle video looping on/off
-- **Playlist Management**: Create and manage audio playlists
+- **Playlist Management**: Create and manage audio playlists with sequential playback
+- **Automatic Audio Selection**: Uses all available audio files if none are specifically selected
+- **Sequential Playback**: Plays all audio files in sequence and loops the entire playlist
 - **File Deletion**: Remove unwanted files with confirmation
 
 ### ⚙️ Stream Configuration
@@ -276,6 +278,8 @@ module.exports = {
 - **Audio Section**:
   - Upload audio tracks
   - Build playlists by selecting multiple files
+  - Sequential playback of all selected audio files
+  - Automatic selection of all available audio files if none selected
   - Remove files from playlist
   - Delete audio files
 
@@ -303,16 +307,21 @@ ffmpeg \
   # Video Input (looped)
   -stream_loop -1 -re -i /path/to/video.mp4 \
   
-  # Audio Input (playlist)
-  -f concat -safe 0 -i /path/to/audio_playlist.txt \
+  # Audio Input (playlist with sequential playback)
+  -f concat -safe 0 -stream_loop -1 -i /path/to/audio_playlist.txt \
+  
+  # Stream Mapping
+  -map 0:v -map 1:a \
   
   # Video Encoding
   -c:v libx264 -preset veryfast \
-  -b:v 2500k -maxrate 3750k -bufsize 7500k \
+  -b:v 2500k -minrate 2500k -maxrate 2500k -bufsize 5000k \
   -vf scale=1280:720 -r 30 -g 60 -pix_fmt yuv420p \
+  -tune zerolatency -profile:v main -level 4.1 \
   
   # Audio Encoding
-  -c:a aac -b:a 128k -ar 44100 -af volume=1.0 \
+  -c:a aac -b:a 128k -ar 44100 -af volume=1.0 -ac 2 \
+  -async 1 \
   
   # Output Settings
   -f flv -flvflags no_duration_filesize \
@@ -323,6 +332,16 @@ ffmpeg \
   # RTMP Destination
   rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
 ```
+
+The audio playlist file is formatted for the FFmpeg concat demuxer to ensure all audio files play in sequence:
+
+```
+file '/path/to/audio1.mp3'
+file '/path/to/audio2.mp3'
+file '/path/to/audio3.mp3'
+```
+
+When the playlist reaches the end, it automatically loops back to the beginning.
 
 ### 🔌 API Endpoints
 
@@ -387,7 +406,8 @@ ffmpeg \
    ```
 2. **Verify media files are selected**:
    - Go to Media tab
-   - Ensure video and audio files are selected
+   - Ensure video is selected
+   - Ensure audio files are available (the system will automatically use all audio files if none are specifically selected)
 3. **Check YouTube stream key**:
    - Go to Settings tab
    - Verify stream key is correct

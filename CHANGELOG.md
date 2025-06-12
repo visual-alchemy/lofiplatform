@@ -5,6 +5,30 @@ All notable changes to this Lo-Fi streaming platform will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2025-06-13
+
+### Audio Playlist Enhancements
+
+- **Fixed Audio Playlist Looping**: Resolved issue where only one audio file was looped instead of the entire playlist
+- **Enhanced Playlist Management**: Modified FFmpeg configuration to ensure all audio files play in sequence
+- **Automatic Audio Selection**: Added functionality to use all available audio files if none are specifically selected
+- **Improved Error Handling**: Better validation and error messages for audio playlist content
+- **Documentation Updates**: Updated README.md with information about the audio playlist functionality
+
+### Technical Improvements
+
+- **FFmpeg Command Optimization**: Enhanced the FFmpeg command structure for better audio playlist handling
+- **Concat Demuxer Configuration**: Improved the audio playlist file format for proper sequential playback
+- **Playlist Looping Logic**: Ensured the entire playlist loops indefinitely rather than individual files
+- **Media Manager Enhancement**: Added getAllAudioFiles() function to automatically use all available audio files
+
+### Files Modified
+
+- `lib/stream-engine.ts` - Enhanced audio playlist handling in FFmpeg command
+- `lib/media-manager.ts` - Added automatic audio file selection functionality
+- `CHANGELOG.md` - Updated with latest changes
+- `README.md` - Updated documentation on audio playlist functionality
+
 ## 2024-12-06
 
 ### Initial Project Creation

@@ -79,6 +79,18 @@ export async function getMediaFiles() {
   }
 }
 
+// Function to get all audio files from the audio directory
+export function getAllAudioFiles() {
+  if (!fs.existsSync(AUDIO_DIR)) {
+    return [];
+  }
+  
+  return fs
+    .readdirSync(AUDIO_DIR)
+    .filter((file) => file.endsWith(".mp3") || file.endsWith(".wav"))
+    .map((file) => path.join(AUDIO_DIR, file));
+}
+
 // Function to get current media selection
 export async function getMediaSelection() {
   if (!fs.existsSync(CONFIG_FILE)) {
@@ -88,6 +100,12 @@ export async function getMediaSelection() {
   try {
     const configData = fs.readFileSync(CONFIG_FILE, "utf-8")
     const config = JSON.parse(configData)
+    
+    // If no audio files are selected, use all available audio files
+    if (config.audioPlaylist && config.audioPlaylist.length === 0) {
+      config.audioPlaylist = getAllAudioFiles();
+    }
+    
     return { ...defaultMediaConfig, ...config }
   } catch (error) {
     console.error("Error reading media config:", error)

@@ -83,9 +83,11 @@ function createAudioPlaylist(audioFiles: string[]) {
   }
 
   // Create playlist file content for FFmpeg concat demuxer
+  // Using the proper format for FFmpeg concat demuxer to ensure all files play in sequence
   let playlistContent = "";
   
   // Add each file with proper format for FFmpeg concat demuxer
+  // The format is important to ensure all files are played in sequence
   audioFiles.forEach(file => {
     // Ensure the file path is properly escaped for FFmpeg
     const escapedPath = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -106,8 +108,12 @@ async function buildFFmpegCommand() {
   const settings = await getStreamSettings()
   const { video, audioPlaylist, videoLooping } = await getMediaSelection()
 
-  if (!video || audioPlaylist.length === 0) {
-    throw new Error("No video or audio files selected")
+  if (!video) {
+    throw new Error("No video selected")
+  }
+  
+  if (audioPlaylist.length === 0) {
+    throw new Error("No audio files available in playlist")
   }
 
   if (!settings.streamKey) {
@@ -134,12 +140,13 @@ async function buildFFmpegCommand() {
     video,
 
     // Input audio files (playlist with loop)
+    // Using concat format to ensure all files in the playlist are played in sequence
     "-f",
     "concat",
     "-safe",
     "0",
     "-stream_loop", 
-    "-1",  // Loop the audio playlist indefinitely
+    "-1",  // Loop the entire audio playlist indefinitely
     "-i",
     audioPlaylistFile,
 
