@@ -73,7 +73,7 @@ Transform your Ubuntu server into a professional 24/7 Lo-Fi streaming station! T
 
 ### 1. Installation
 
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/yourusername/lofi-streaming-platform.git
 cd lofi-streaming-platform
@@ -83,7 +83,7 @@ chmod +x install.sh
 
 # Run the automated installer
 ./install.sh
-\`\`\`
+```
 
 The installer will:
 - ✅ Update system packages
@@ -96,20 +96,20 @@ The installer will:
 
 ### 2. Add Your Media Files
 
-\`\`\`bash
+```bash
 # Add video backgrounds (MP4 format recommended)
 cp your-video.mp4 media/videos/
 
 # Add audio tracks (MP3 format recommended)
 cp your-audio.mp3 media/audio/
-\`\`\`
+```
 
 ### 3. Configure Your Stream
 
 1. **Start the application**:
-   \`\`\`bash
+   ```bash
    npm run dev
-   \`\`\`
+   ```
 
 2. **Open the dashboard**: Navigate to `http://localhost:3000`
 
@@ -133,7 +133,7 @@ cp your-audio.mp3 media/audio/
 
 For 24/7 operation, use PM2:
 
-\`\`\`bash
+```bash
 # Start in production mode
 npm run start:prod
 
@@ -145,7 +145,7 @@ npm run restart:prod
 
 # Stop the application
 npm run stop:prod
-\`\`\`
+```
 
 ---
 
@@ -153,7 +153,7 @@ npm run stop:prod
 
 ### 🏗️ System Architecture
 
-\`\`\`
+```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Web Dashboard │    │  Stream Engine  │    │   YouTube Live  │
 │                 │    │                 │    │                 │
@@ -171,11 +171,11 @@ npm run stop:prod
 │  • media.json   │    │  • audio/       │
 │  • CHANGELOG.md │    │  • playlists    │
 └─────────────────┘    └─────────────────┘
-\`\`\`
+```
 
 ### 📁 Project Structure
 
-\`\`\`
+```
 lofi-streaming-platform/
 ├── 📁 app/                     # Next.js app directory
 │   ├── 📁 api/                 # API routes
@@ -209,12 +209,12 @@ lofi-streaming-platform/
 ├── ecosystem.config.js         # PM2 configuration
 ├── install.sh                  # Installation script
 └── README.md                   # This file
-\`\`\`
+```
 
 ### 🔧 Configuration Files
 
 #### `config/settings.json`
-\`\`\`json
+```json
 {
   "rtmpUrl": "rtmp://a.rtmp.youtube.com/live2",
   "streamKey": "your-youtube-stream-key",
@@ -224,10 +224,10 @@ lofi-streaming-platform/
   "fps": 30,
   "audioVolume": 1.0
 }
-\`\`\`
+```
 
 #### `config/media.json`
-\`\`\`json
+```json
 {
   "video": "/path/to/selected/video.mp4",
   "audioPlaylist": [
@@ -236,10 +236,10 @@ lofi-streaming-platform/
   ],
   "videoLooping": true
 }
-\`\`\`
+```
 
 #### `ecosystem.config.js` (PM2)
-\`\`\`javascript
+```javascript
 module.exports = {
   apps: [{
     name: "lofi-stream",
@@ -255,7 +255,7 @@ module.exports = {
     }
   }]
 }
-\`\`\`
+```
 
 ---
 
@@ -298,7 +298,7 @@ module.exports = {
 
 The platform generates FFmpeg commands like this:
 
-\`\`\`bash
+```bash
 ffmpeg \
   # Video Input (looped)
   -stream_loop -1 -re -i /path/to/video.mp4 \
@@ -322,7 +322,7 @@ ffmpeg \
   
   # RTMP Destination
   rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
-\`\`\`
+```
 
 ### 🔌 API Endpoints
 
@@ -343,34 +343,34 @@ ffmpeg \
 ### 🎚️ Quality Presets
 
 #### 🏆 High Quality (1080p)
-\`\`\`json
+```json
 {
   "resolution": "1920x1080",
   "fps": 30,
   "videoBitrate": 4500,
   "audioBitrate": 192
 }
-\`\`\`
+```
 
 #### ⚖️ Balanced (720p)
-\`\`\`json
+```json
 {
   "resolution": "1280x720",
   "fps": 30,
   "videoBitrate": 2500,
   "audioBitrate": 128
 }
-\`\`\`
+```
 
 #### 💾 Low Bandwidth (480p)
-\`\`\`json
+```json
 {
   "resolution": "854x480",
   "fps": 24,
   "videoBitrate": 1200,
   "audioBitrate": 96
 }
-\`\`\`
+```
 
 ---
 
@@ -382,9 +382,9 @@ ffmpeg \
 
 **Solutions**:
 1. **Check FFmpeg installation**:
-   \`\`\`bash
+   ```bash
    ffmpeg -version
-   \`\`\`
+   ```
 2. **Verify media files are selected**:
    - Go to Media tab
    - Ensure video and audio files are selected
@@ -402,10 +402,10 @@ ffmpeg \
 
 **Solutions**:
 1. **Test internet connection**:
-   \`\`\`bash
+   ```bash
    ping youtube.com
    speedtest-cli
-   \`\`\`
+   ```
 2. **Check RTMP URL**:
    - Verify the RTMP endpoint is correct
    - Try alternative YouTube RTMP servers
@@ -413,9 +413,9 @@ ffmpeg \
    - Lower video bitrate if bandwidth is limited
    - Monitor connection stability
 4. **Firewall settings**:
-   \`\`\`bash
+   ```bash
    sudo ufw allow 1935/tcp  # RTMP port
-   \`\`\`
+   ```
 
 ### 🖥️ Performance Issues
 
@@ -435,11 +435,11 @@ ffmpeg \
    - Ensure sufficient space for logs
    - Clean up old log files if needed
 4. **Hardware acceleration** (if available):
-   \`\`\`bash
+   ```bash
    # Check for hardware encoders
    ffmpeg -encoders | grep nvenc  # NVIDIA
    ffmpeg -encoders | grep vaapi  # Intel/AMD
-   \`\`\`
+   ```
 
 ### 📁 File Upload Issues
 
@@ -447,10 +447,10 @@ ffmpeg \
 
 **Solutions**:
 1. **Check file permissions**:
-   \`\`\`bash
+   ```bash
    sudo chown -R $USER:$USER media/
    chmod -R 755 media/
-   \`\`\`
+   ```
 2. **Verify file formats**:
    - Videos: MP4, WebM
    - Audio: MP3, WAV
@@ -467,24 +467,24 @@ ffmpeg \
 
 **Solutions**:
 1. **Check PM2 status**:
-   \`\`\`bash
+   ```bash
    pm2 status
    pm2 logs lofi-stream
-   \`\`\`
+   ```
 2. **Restart services**:
-   \`\`\`bash
+   ```bash
    pm2 restart lofi-stream
    # or
    npm run restart:prod
-   \`\`\`
+   ```
 3. **Check port availability**:
-   \`\`\`bash
+   ```bash
    sudo netstat -tlnp | grep :3000
-   \`\`\`
+   ```
 4. **Review system logs**:
-   \`\`\`bash
+   ```bash
    journalctl -u pm2-$USER -f
-   \`\`\`
+   ```
 
 ---
 
