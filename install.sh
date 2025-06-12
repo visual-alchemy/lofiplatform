@@ -22,7 +22,7 @@ sudo npm install -g pm2
 
 # Install project dependencies
 echo "Installing project dependencies..."
-npm install --legacy-peer-deps
+npm install
 
 # Run setup script
 echo "Running setup script..."

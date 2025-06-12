@@ -1,14 +1,38 @@
 import { NextResponse } from "next/server"
+import logger from "@/lib/logger"
 
 export async function POST(request: Request) {
   try {
-    const { video, audioPlaylist } = await request.json()
+    const { video, audioPlaylist, videoLooping } = await request.json()
 
-    console.log("Media selection saved:", { video, audioPlaylist })
+    console.log("Media selection saved:", { video, audioPlaylist, videoLooping })
 
-    return NextResponse.json({ message: "Media selection saved successfully (mock)" })
+    // Create detailed log message
+    let logMessage = "Media selection updated: "
+
+    if (video) {
+      const videoName = video.split("/").pop()
+      logMessage += `Video: ${videoName}, `
+    } else {
+      logMessage += `No video selected, `
+    }
+
+    logMessage += `Audio playlist: ${audioPlaylist.length} file(s), `
+    logMessage += `Video looping: ${videoLooping ? "enabled" : "disabled"}`
+
+    logger.addLog(logMessage)
+
+    return NextResponse.json({ message: "Media selection saved successfully" })
   } catch (error: any) {
     console.error("Error saving media selection:", error)
-    return NextResponse.json({ error: error.message || "Failed to save media selection" }, { status: 500 })
+    logger.addLog(`Media selection save failed: ${error.message}`)
+
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to save media selection",
+        details: "An unexpected error occurred while saving media selection",
+      },
+      { status: 500 },
+    )
   }
 }

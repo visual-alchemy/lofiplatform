@@ -3,34 +3,57 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, Play, Square, RefreshCw } from "lucide-react"
+import { AlertCircle, Play, Square, RefreshCw, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface StreamControlProps {
   status: "idle" | "streaming" | "error"
 }
 
-export function StreamControl({ status }: StreamControlProps) {
+export function StreamControl({ status: initialStatus }: StreamControlProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [status, setStatus] = useState(initialStatus)
+  const router = useRouter()
 
   const handleStreamAction = async (action: "start" | "stop" | "restart") => {
     setIsLoading(true)
 
+    // Show immediate feedback
+    toast.info(`${action.charAt(0).toUpperCase() + action.slice(1)}ing stream...`)
+
     try {
       const response = await fetch(`/api/stream/${action}`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        toast.success(data.message)
+        // Update local status immediately for better UX
+        if (action === "start") {
+          setStatus("streaming")
+          toast.success("Stream started successfully")
+        } else if (action === "stop") {
+          setStatus("idle")
+          toast.success("Stream stopped successfully")
+        } else if (action === "restart") {
+          setStatus("streaming")
+          toast.success("Stream restarted successfully")
+        }
+
+        // Refresh the page data
+        router.refresh()
       } else {
-        toast.error(data.error || "Failed to perform action")
+        toast.error(data.error || `Failed to ${action} stream`)
+        console.error(`Stream ${action} error:`, data.error)
       }
     } catch (error) {
-      toast.error("Failed to connect to server")
-      console.error(error)
+      console.error(`Error during ${action} stream:`, error)
+      toast.error(`Failed to connect to server. Check console for details.`)
     } finally {
       setIsLoading(false)
     }
@@ -76,9 +99,14 @@ export function StreamControl({ status }: StreamControlProps) {
           variant={status === "streaming" ? "destructive" : "default"}
           onClick={() => handleStreamAction(status === "streaming" ? "stop" : "start")}
           disabled={isLoading || status === "error"}
-          className={status !== "streaming" ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}
+          className={`${status !== "streaming" ? "bg-purple-600 hover:bg-purple-700 text-white" : ""} min-w-[140px]`}
         >
-          {status === "streaming" ? (
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {status === "streaming" ? "Stopping..." : "Starting..."}
+            </>
+          ) : status === "streaming" ? (
             <>
               <Square className="mr-2 h-4 w-4" />
               Stop Stream
@@ -97,7 +125,7 @@ export function StreamControl({ status }: StreamControlProps) {
           disabled={isLoading}
           className="border-gray-300 text-gray-700 hover:bg-gray-50"
         >
-          <RefreshCw className="mr-2 h-4 w-4" />
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
           Restart
         </Button>
       </CardFooter>

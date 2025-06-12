@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Clock, Gauge, Activity, RefreshCw } from "lucide-react"
+import { Clock, Gauge, Activity, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface StreamMonitorProps {
   status: "idle" | "streaming" | "error"
@@ -17,25 +18,39 @@ interface StreamMonitorProps {
 
 export function StreamMonitor({ status, stats }: StreamMonitorProps) {
   const [logs, setLogs] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchLogs = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const response = await fetch("/api/stream/logs")
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.logs) {
+        setLogs(data.logs)
+      } else {
+        // Handle case where logs property is missing
+        setLogs([`[${new Date().toISOString()}] No logs available`])
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch logs:", err)
+      setError(err.message || "Failed to fetch logs")
+      // Don't clear existing logs on error
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    // Fetch initial logs with error handling
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch("/api/stream/logs")
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
-        if (data.logs) {
-          setLogs(data.logs)
-        }
-      } catch (err) {
-        console.error("Failed to fetch logs:", err)
-        setLogs(["Error: Failed to fetch logs"])
-      }
-    }
-
+    // Fetch initial logs
     fetchLogs()
 
     // Set up polling for log updates
@@ -43,6 +58,10 @@ export function StreamMonitor({ status, stats }: StreamMonitorProps) {
 
     return () => clearInterval(interval)
   }, [])
+
+  const handleRefreshLogs = () => {
+    fetchLogs()
+  }
 
   return (
     <div className="space-y-6">
@@ -85,23 +104,40 @@ export function StreamMonitor({ status, stats }: StreamMonitorProps) {
       </Card>
 
       <Card className="bg-white border-gray-200 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-gray-900">Stream Logs</CardTitle>
-          <CardDescription className="text-gray-600">Recent activity</CardDescription>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg text-gray-900">Stream Logs</CardTitle>
+            <CardDescription className="text-gray-600">Recent activity</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleRefreshLogs} disabled={isLoading} className="h-8 px-2">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="ml-1">Refresh</span>
+          </Button>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[300px] rounded-md border border-gray-200 bg-gray-50 p-2">
-            <div className="font-mono text-xs space-y-1">
-              {logs.length === 0 ? (
-                <p className="text-gray-500 p-2">No logs available</p>
-              ) : (
-                logs.map((log, index) => (
+            {error ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+                <p className="text-red-500 font-medium">{error}</p>
+                <p className="text-gray-500 text-sm mt-1">Check your connection and try refreshing</p>
+              </div>
+            ) : isLoading && logs.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-6 w-6 text-purple-600 animate-spin" />
+                <span className="ml-2 text-gray-600">Loading logs...</span>
+              </div>
+            ) : logs.length === 0 ? (
+              <p className="text-gray-500 p-2">No logs available</p>
+            ) : (
+              <div className="font-mono text-xs space-y-1">
+                {logs.map((log, index) => (
                   <div key={index} className="py-1 border-b border-gray-200 last:border-0 text-gray-800">
                     {log}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </ScrollArea>
         </CardContent>
       </Card>

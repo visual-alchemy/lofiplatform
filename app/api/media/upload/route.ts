@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import logger from "@/lib/logger"
 
 export async function POST(request: Request) {
   try {
@@ -12,19 +13,44 @@ export async function POST(request: Request) {
 
     console.log(`Upload requested: ${files.length} ${type} files`)
 
+    // Log the upload attempt
+    logger.addLog(`Upload started: ${files.length} ${type} file(s)`)
+
+    // Add a small delay to simulate processing
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
     // Mock response
     const mockFiles = files.map((file) => ({
       name: file.name,
       path: `/media/${type}/${file.name}`,
-      selected: false,
+      selected: true, // Mark as selected by default
     }))
 
+    // Log successful upload with file names
+    const fileNames = files.map((f) => f.name).join(", ")
+    logger.addLog(`Upload completed: ${files.length} ${type} file(s) - ${fileNames}`)
+
+    // Log auto-selection
+    if (type === "video") {
+      logger.addLog(`Auto-selected video: ${files[0].name}`)
+    } else {
+      logger.addLog(`Auto-added ${files.length} audio file(s) to playlist`)
+    }
+
     return NextResponse.json({
-      message: `${files.length} files uploaded successfully (mock)`,
+      message: `${files.length} files uploaded successfully`,
       files: mockFiles,
     })
   } catch (error: any) {
     console.error("Error uploading files:", error)
-    return NextResponse.json({ error: error.message || "Failed to upload files" }, { status: 500 })
+    logger.addLog(`Upload failed: ${error.message}`)
+
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to upload files",
+        details: "An unexpected error occurred during file upload",
+      },
+      { status: 500 },
+    )
   }
 }

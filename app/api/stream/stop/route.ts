@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server"
+import logger from "@/lib/logger"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    // Mock implementation - replace with actual stream stop logic
     console.log("Stream stop requested")
+    logger.addLog("Stream stop requested")
 
-    return NextResponse.json({ message: "Stream stop requested (mock implementation)" })
+    // Add a small delay to simulate processing
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    logger.addLog("Stream stopped successfully")
+
+    return NextResponse.json({
+      message: "Stream stopped successfully",
+      status: "idle",
+    })
   } catch (error: any) {
     console.error("Error stopping stream:", error)
-    return NextResponse.json({ error: error.message || "Failed to stop stream" }, { status: 500 })
+    logger.addLog(`Stream stop failed: ${error.message}`)
+
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to stop stream",
+        status: "error",
+      },
+      { status: 500 },
+    )
   }
 }

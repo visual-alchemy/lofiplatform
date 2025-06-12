@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
-import { Check, Music, Video, X, Trash2, RotateCcw } from "lucide-react"
+import { Check, Music, Video, X, Trash2, RotateCcw, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface MediaFile {
@@ -26,27 +26,34 @@ export function MediaSelector() {
   const [selectedAudioPlaylist, setSelectedAudioPlaylist] = useState<string[]>([])
   const [videoLooping, setVideoLooping] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     // Fetch available media files
     const fetchMedia = async () => {
       try {
         const response = await fetch("/api/media/list")
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
         const data = await response.json()
 
-        if (response.ok) {
-          setVideoFiles(data.videos.map((v: any) => ({ ...v, selected: v.selected || false })))
-          setAudioFiles(data.audio.map((a: any) => ({ ...a, selected: a.selected || false })))
+        if (response.ok && data) {
+          setVideoFiles(data.videos?.map((v: any) => ({ ...v, selected: v.selected || false })) || [])
+          setAudioFiles(data.audio?.map((a: any) => ({ ...a, selected: a.selected || false })) || [])
 
           // Set selected video and audio
-          const selectedVid = data.videos.find((v: any) => v.selected)
+          const selectedVid = data.videos?.find((v: any) => v.selected)
           if (selectedVid) setSelectedVideo(selectedVid.path)
 
-          const selectedAudio = data.audio.filter((a: any) => a.selected).map((a: any) => a.path)
+          const selectedAudio = data.audio?.filter((a: any) => a.selected).map((a: any) => a.path) || []
           setSelectedAudioPlaylist(selectedAudio)
         }
       } catch (error) {
         console.error("Failed to fetch media files:", error)
+        toast.error("Failed to load media files")
       }
     }
 
@@ -61,18 +68,27 @@ export function MediaSelector() {
         selected: file.path === path,
       })),
     )
+
+    // Auto-save when a video is selected
+    handleSaveMedia(path, selectedAudioPlaylist, videoLooping)
   }
 
   const handleAudioToggle = (path: string) => {
     const isSelected = selectedAudioPlaylist.includes(path)
+    let newPlaylist: string[]
 
     if (isSelected) {
-      setSelectedAudioPlaylist(selectedAudioPlaylist.filter((p) => p !== path))
+      newPlaylist = selectedAudioPlaylist.filter((p) => p !== path)
+      setSelectedAudioPlaylist(newPlaylist)
       setAudioFiles(audioFiles.map((file) => (file.path === path ? { ...file, selected: false } : file)))
     } else {
-      setSelectedAudioPlaylist([...selectedAudioPlaylist, path])
+      newPlaylist = [...selectedAudioPlaylist, path]
+      setSelectedAudioPlaylist(newPlaylist)
       setAudioFiles(audioFiles.map((file) => (file.path === path ? { ...file, selected: true } : file)))
     }
+
+    // Auto-save when audio selection changes
+    handleSaveMedia(selectedVideo, newPlaylist, videoLooping)
   }
 
   const handleDeleteFile = async (filePath: string, type: "video" | "audio") => {
@@ -85,6 +101,12 @@ export function MediaSelector() {
         body: JSON.stringify({ filePath, type }),
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
       if (response.ok) {
         toast.success("File deleted successfully")
 
@@ -93,23 +115,37 @@ export function MediaSelector() {
           setVideoFiles(videoFiles.filter((file) => file.path !== filePath))
           if (selectedVideo === filePath) {
             setSelectedVideo(null)
+            // Auto-save when selected video is deleted
+            handleSaveMedia(null, selectedAudioPlaylist, videoLooping)
           }
         } else {
           setAudioFiles(audioFiles.filter((file) => file.path !== filePath))
-          setSelectedAudioPlaylist(selectedAudioPlaylist.filter((path) => path !== filePath))
+          const newPlaylist = selectedAudioPlaylist.filter((path) => path !== filePath)
+          setSelectedAudioPlaylist(newPlaylist)
+          // Auto-save when audio is removed from playlist
+          handleSaveMedia(selectedVideo, newPlaylist, videoLooping)
         }
       } else {
-        const data = await response.json()
         toast.error(data.error || "Failed to delete file")
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delete file error:", error)
       toast.error("Failed to connect to server")
-      console.error(error)
     }
   }
 
-  const handleSaveMedia = async () => {
-    setIsLoading(true)
+  const handleToggleVideoLooping = (checked: boolean) => {
+    setVideoLooping(checked)
+    // Auto-save when looping setting changes
+    handleSaveMedia(selectedVideo, selectedAudioPlaylist, checked)
+  }
+
+  const handleSaveMedia = async (
+    videoPath: string | null = selectedVideo,
+    audioPlaylist: string[] = selectedAudioPlaylist,
+    looping: boolean = videoLooping,
+  ) => {
+    setIsSaving(true)
 
     try {
       const response = await fetch("/api/media/save", {
@@ -118,24 +154,28 @@ export function MediaSelector() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          video: selectedVideo,
-          audioPlaylist: selectedAudioPlaylist,
-          videoLooping,
+          video: videoPath,
+          audioPlaylist: audioPlaylist,
+          videoLooping: looping,
         }),
       })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
       const data = await response.json()
 
       if (response.ok) {
-        toast.success("Media selection saved successfully")
+        toast.success("Media selection saved")
       } else {
         toast.error(data.error || "Failed to save media selection")
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Save media error:", error)
       toast.error("Failed to connect to server")
-      console.error(error)
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
@@ -157,23 +197,72 @@ export function MediaSelector() {
         body: formData,
       })
 
+      // Check if response is ok first
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Check if response is actually JSON
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response")
+      }
+
       const data = await response.json()
 
-      if (response.ok) {
-        toast.success(`${files.length} ${type} file(s) uploaded successfully`)
-
-        // Update the file lists
-        if (type === "video") {
-          setVideoFiles([...videoFiles, ...data.files.map((f: any) => ({ ...f, selected: false }))])
-        } else {
-          setAudioFiles([...audioFiles, ...data.files.map((f: any) => ({ ...f, selected: false }))])
-        }
-      } else {
-        toast.error(data.error || `Failed to upload ${type} files`)
+      if (data.error) {
+        throw new Error(data.error)
       }
-    } catch (error) {
-      toast.error("Failed to connect to server")
-      console.error(error)
+
+      toast.success(`${files.length} ${type} file(s) uploaded successfully`)
+
+      // Update the file lists and automatically select newly uploaded files
+      if (type === "video" && data.files && data.files.length > 0) {
+        // For videos, select the first uploaded video
+        const newVideoPath = data.files[0].path
+
+        // Update video files list with the new files
+        const updatedVideoFiles = [
+          ...videoFiles.map((file) => ({ ...file, selected: false })), // Deselect all existing videos
+          ...data.files.map((f: any, index: number) => ({
+            ...f,
+            selected: index === 0, // Select only the first uploaded video
+          })),
+        ]
+
+        setVideoFiles(updatedVideoFiles)
+        setSelectedVideo(newVideoPath)
+
+        // Auto-save with the newly uploaded video selected
+        handleSaveMedia(newVideoPath, selectedAudioPlaylist, videoLooping)
+      } else if (type === "audio" && data.files && data.files.length > 0) {
+        // For audio, add all uploaded files to the playlist
+        const newAudioPaths = data.files.map((f: any) => f.path)
+
+        // Update audio files list with the new files
+        const updatedAudioFiles = [
+          ...audioFiles,
+          ...data.files.map((f: any) => ({ ...f, selected: true })), // Select all new audio files
+        ]
+
+        setAudioFiles(updatedAudioFiles)
+        const newPlaylist = [...selectedAudioPlaylist, ...newAudioPaths]
+        setSelectedAudioPlaylist(newPlaylist)
+
+        // Auto-save with the newly uploaded audio added to playlist
+        handleSaveMedia(selectedVideo, newPlaylist, videoLooping)
+      }
+    } catch (error: any) {
+      console.error("Upload error:", error)
+
+      // Provide more specific error messages
+      if (error.message.includes("HTTP error")) {
+        toast.error("Server error occurred during upload")
+      } else if (error.message.includes("non-JSON response")) {
+        toast.error("Server returned an invalid response")
+      } else {
+        toast.error(error.message || "Failed to upload files")
+      }
     } finally {
       setIsLoading(false)
       // Reset the file input
@@ -206,9 +295,9 @@ export function MediaSelector() {
                 <h3 className="text-sm font-medium text-gray-900">Background Videos</h3>
                 <Label
                   htmlFor="video-upload"
-                  className="cursor-pointer text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  className={`cursor-pointer text-xs text-purple-600 hover:text-purple-700 font-medium ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  Upload Video
+                  {isLoading ? "Uploading..." : "Upload Video"}
                 </Label>
                 <Input
                   id="video-upload"
@@ -216,12 +305,13 @@ export function MediaSelector() {
                   accept="video/mp4,video/webm"
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, "video")}
+                  disabled={isLoading}
                   multiple
                 />
               </div>
 
               <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
-                <Switch id="video-looping" checked={videoLooping} onCheckedChange={setVideoLooping} />
+                <Switch id="video-looping" checked={videoLooping} onCheckedChange={handleToggleVideoLooping} />
                 <Label htmlFor="video-looping" className="text-sm text-gray-700 flex items-center gap-2">
                   <RotateCcw className="h-4 w-4" />
                   Loop selected video
@@ -230,7 +320,12 @@ export function MediaSelector() {
 
               <ScrollArea className="h-64 rounded-md border border-gray-200 bg-gray-50">
                 <div className="p-4 space-y-2">
-                  {videoFiles.length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 text-purple-600 animate-spin" />
+                      <span className="ml-2 text-sm text-gray-600">Uploading video...</span>
+                    </div>
+                  ) : videoFiles.length === 0 ? (
                     <p className="text-sm text-gray-500 text-center py-8">No video files available</p>
                   ) : (
                     videoFiles.map((file) => (
@@ -275,9 +370,9 @@ export function MediaSelector() {
                 <h3 className="text-sm font-medium text-gray-900">Audio Playlist</h3>
                 <Label
                   htmlFor="audio-upload"
-                  className="cursor-pointer text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  className={`cursor-pointer text-xs text-purple-600 hover:text-purple-700 font-medium ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  Upload Audio
+                  {isLoading ? "Uploading..." : "Upload Audio"}
                 </Label>
                 <Input
                   id="audio-upload"
@@ -285,13 +380,19 @@ export function MediaSelector() {
                   accept="audio/mp3,audio/wav"
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, "audio")}
+                  disabled={isLoading}
                   multiple
                 />
               </div>
 
               <ScrollArea className="h-64 rounded-md border border-gray-200 bg-gray-50">
                 <div className="p-4 space-y-2">
-                  {audioFiles.length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 text-purple-600 animate-spin" />
+                      <span className="ml-2 text-sm text-gray-600">Uploading audio...</span>
+                    </div>
+                  ) : audioFiles.length === 0 ? (
                     <p className="text-sm text-gray-500 text-center py-8">No audio files available</p>
                   ) : (
                     audioFiles.map((file) => (
@@ -340,13 +441,10 @@ export function MediaSelector() {
         </Tabs>
       </CardContent>
       <CardFooter>
-        <Button
-          onClick={handleSaveMedia}
-          disabled={isLoading || (!selectedVideo && selectedAudioPlaylist.length === 0)}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
-        >
-          Save Media Selection
-        </Button>
+        <p className="text-xs text-gray-500 italic flex items-center gap-2">
+          {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
+          Changes are saved automatically when you select or upload files
+        </p>
       </CardFooter>
     </Card>
   )

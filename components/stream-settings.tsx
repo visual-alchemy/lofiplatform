@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 interface StreamSettings {
   rtmpUrl: string
@@ -30,6 +31,7 @@ export function StreamSettings() {
     audioVolume: 1.0,
   })
 
+  const [originalSettings, setOriginalSettings] = useState<StreamSettings | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function StreamSettings() {
 
         if (response.ok) {
           setSettings(data)
+          setOriginalSettings(data) // Store original settings for comparison
         }
       } catch (error) {
         console.error("Failed to fetch settings:", error)
@@ -54,18 +57,51 @@ export function StreamSettings() {
     setIsLoading(true)
 
     try {
+      // Generate a list of changes for logging
+      const changes: string[] = []
+
+      if (originalSettings) {
+        if (settings.resolution !== originalSettings.resolution) {
+          changes.push(`Resolution changed from ${originalSettings.resolution} to ${settings.resolution}`)
+        }
+        if (settings.fps !== originalSettings.fps) {
+          changes.push(`FPS changed from ${originalSettings.fps} to ${settings.fps}`)
+        }
+        if (settings.videoBitrate !== originalSettings.videoBitrate) {
+          changes.push(`Video bitrate changed from ${originalSettings.videoBitrate} to ${settings.videoBitrate} kbps`)
+        }
+        if (settings.audioBitrate !== originalSettings.audioBitrate) {
+          changes.push(`Audio bitrate changed from ${originalSettings.audioBitrate} to ${settings.audioBitrate} kbps`)
+        }
+        if (settings.audioVolume !== originalSettings.audioVolume) {
+          changes.push(
+            `Audio volume changed from ${Math.round(originalSettings.audioVolume * 100)}% to ${Math.round(settings.audioVolume * 100)}%`,
+          )
+        }
+        if (settings.rtmpUrl !== originalSettings.rtmpUrl) {
+          changes.push(`RTMP URL changed from ${originalSettings.rtmpUrl} to ${settings.rtmpUrl}`)
+        }
+        if (settings.streamKey !== originalSettings.streamKey && settings.streamKey && originalSettings.streamKey) {
+          changes.push(`Stream key updated`)
+        }
+      }
+
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          ...settings,
+          changes, // Include the changes for logging
+        }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
         toast.success("Stream settings saved successfully")
+        setOriginalSettings(settings) // Update original settings after successful save
       } else {
         toast.error(data.error || "Failed to save settings")
       }
@@ -214,7 +250,14 @@ export function StreamSettings() {
           disabled={isLoading}
           className="bg-purple-600 hover:bg-purple-700 text-white"
         >
-          Save Settings
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Settings"
+          )}
         </Button>
       </CardFooter>
     </Card>

@@ -214,3 +214,206 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New delete functionality requires proper file system permissions
 - Video looping setting will be saved with media selections
 - UI changes are automatically applied on update
+
+## 2024-12-06 (Stream Control Fixes)
+
+### Stream Control Improvements
+
+- Fixed issue where Start Stream button wasn't working
+- Added loading states to stream control buttons
+- Implemented immediate feedback via toast notifications
+- Added spinner animations during API calls
+- Enhanced error handling for stream operations
+
+### API Enhancements
+
+- Improved API response structure for stream control endpoints
+- Added simulated processing delays for better UX testing
+- Enhanced error reporting from API endpoints
+- Added status updates in API responses
+
+### User Experience Improvements
+
+- Added immediate UI updates after button clicks
+- Implemented local state management for better responsiveness
+- Added router.refresh() to update page data after actions
+- Enhanced debugging with detailed console logs
+
+### Technical Improvements
+
+- Fixed button sizing to prevent layout shifts
+- Maintained visual consistency during loading states
+- Improved accessibility of button states
+- Integrated toast notifications for non-intrusive feedback
+
+## 2024-12-07 (Usability Enhancements)
+
+### Automatic Media Selection
+
+- **Auto-Select Uploads**: Newly uploaded files are now automatically selected
+- **Auto-Save Selection**: Media selections are saved automatically without requiring manual save
+- **Removed Save Button**: Eliminated the need for manual "Save Media Selection" button
+- **Immediate Feedback**: Added visual indicators during upload and selection process
+- **Loading States**: Enhanced loading states during file uploads
+
+### Settings Change Logging
+
+- **Settings Change Tracking**: All settings changes are now logged to Stream Logs
+- **Detailed Change Records**: Each setting change is logged with before/after values
+- **Timestamp Tracking**: All changes include precise timestamps
+- **Visual Feedback**: Added loading state to settings save button
+- **Original Settings Tracking**: Added comparison between original and new settings
+
+### API Enhancements
+
+- **Global Log Storage**: Implemented global mock logs for development
+- **Log Integration**: Connected settings changes to stream logs
+- **Upload Logging**: Added file upload events to stream logs
+- **Media Selection Logging**: Added media selection changes to stream logs
+
+### User Experience Improvements
+
+- **Streamlined Workflow**: Reduced steps needed to select and use media files
+- **Automatic Actions**: Eliminated manual steps for common operations
+- **Better Feedback**: Added more visual indicators for system state
+- **Informational Messages**: Added helpful text explaining automatic saving
+
+### Technical Improvements
+
+- **State Management**: Better handling of component state during operations
+- **Event Handling**: Improved event flow for media selection
+- **Error Prevention**: Reduced potential for user error by automating common tasks
+- **Code Organization**: Refactored for better maintainability
+
+### Files Modified
+
+- `components/media-selector.tsx` - Added auto-selection and auto-save functionality
+- `components/stream-settings.tsx` - Added settings change tracking and logging
+- `app/api/settings/route.ts` - Enhanced to log settings changes
+- `app/api/stream/logs/route.ts` - Updated to store and retrieve logs
+- `app/api/media/upload/route.ts` - Modified to log uploads and mark files as selected
+- `app/api/media/save/route.ts` - Enhanced to provide better logging
+
+### Reasoning
+
+- **User Request**: Direct implementation of requested features
+- **Usability**: Streamlined workflow reduces friction and user errors
+- **Transparency**: Better logging provides clearer understanding of system state
+- **Efficiency**: Automatic actions reduce number of clicks needed
+
+## 2024-12-07 (JSON Parsing Error Fixes)
+
+### Error Resolution
+
+- **Fixed JSON Parsing Error**: Resolved "Unexpected token 'I', "Internal s"..." error in file upload
+- **Import Issues**: Fixed module import problems causing API routes to return HTML error pages
+- **Response Validation**: Added proper response validation before JSON parsing
+- **Error Handling**: Enhanced error handling throughout the application
+
+### API Improvements
+
+- **Safe Imports**: Implemented try-catch blocks around module imports
+- **Fallback Functions**: Added fallback logging functions when imports fail
+- **JSON Guarantee**: Ensured all API routes always return valid JSON responses
+- **Content-Type Validation**: Added content-type checks before parsing responses
+
+### Frontend Enhancements
+
+- **Response Checking**: Added response.ok and content-type validation
+- **Error Messages**: Improved error messages for different failure scenarios
+- **User Feedback**: Enhanced toast notifications for various error states
+- **Graceful Degradation**: Better handling of API failures
+
+### Technical Improvements
+
+- **Error Boundaries**: Added comprehensive error handling in API routes
+- **Status Code Validation**: Proper HTTP status code handling throughout
+- **Import Safety**: Used dynamic imports with fallbacks to prevent crashes
+- **Response Validation**: Multiple layers of response validation
+
+### Files Modified
+
+- `app/api/media/upload/route.ts` - Fixed import issues and added error handling
+- `app/api/media/save/route.ts` - Enhanced error handling and response validation
+- `app/api/settings/route.ts` - Improved import safety and error handling
+- `components/media-selector.tsx` - Added response validation and better error handling
+
+### Reasoning
+
+- **Error Prevention**: Prevent API routes from returning HTML error pages
+- **User Experience**: Provide clear feedback when errors occur
+- **Reliability**: Make the application more robust and error-resistant
+- **Debugging**: Better error messages for easier troubleshooting
+
+## 2024-12-07 (Logging System Overhaul)
+
+### Centralized Logging System
+
+- **New Logger Class**: Created a centralized logging system in `lib/logger.ts`
+- **Singleton Pattern**: Implemented singleton logger instance for consistent logging
+- **Memory Management**: Added automatic log rotation to prevent memory issues
+- **Persistent Logs**: Logs now persist properly across API calls
+
+### Stream Logs Functionality
+
+- **Settings Change Logging**: Fixed issue where Stream Settings changes weren't appearing in logs
+- **Upload Logging**: Added comprehensive logging for file uploads (video and audio)
+- **Detailed Messages**: Enhanced log messages with more specific information
+- **Real-time Updates**: Stream Logs now update immediately when actions are performed
+
+### Enhanced Logging Coverage
+
+- **Settings Changes**: All settings modifications are now logged with before/after values
+- **File Uploads**: Upload events are logged with file names and auto-selection status
+- **Media Selection**: Media selection changes are logged with detailed information
+- **Stream Control**: All stream start/stop/restart actions are logged
+- **File Deletion**: File deletion events are logged with file names
+- **Error Logging**: All errors are now properly logged for debugging
+
+### API Improvements
+
+- **Consistent Logging**: All API routes now use the centralized logger
+- **Error Handling**: Better error logging throughout all endpoints
+- **Status Messages**: More informative log messages for all operations
+- **Import Safety**: Removed problematic import patterns that were causing issues
+
+### User Experience Improvements
+
+- **Real-time Feedback**: Stream Logs update immediately after actions
+- **Detailed Information**: More informative log messages
+- **Better Debugging**: Easier to track what's happening in the system
+- **Automatic Updates**: No need to manually refresh logs
+
+### Technical Improvements
+
+- **Memory Efficiency**: Automatic log cleanup prevents memory leaks
+- **Type Safety**: Proper TypeScript implementation for the logger
+- **Error Resilience**: Logger continues working even if individual operations fail
+- **Performance**: Efficient logging that doesn't impact application performance
+
+### Files Modified
+
+- `lib/logger.ts` - New centralized logging system
+- `app/api/stream/logs/route.ts` - Updated to use new logger
+- `app/api/settings/route.ts` - Enhanced settings change logging
+- `app/api/media/upload/route.ts` - Added comprehensive upload logging
+- `app/api/media/save/route.ts` - Improved media selection logging
+- `app/api/media/delete/route.ts` - Added file deletion logging
+- `app/api/stream/start/route.ts` - Enhanced stream control logging
+- `app/api/stream/stop/route.ts` - Enhanced stream control logging
+- `app/api/stream/restart/route.ts` - Enhanced stream control logging
+
+### Bug Fixes
+
+- **Settings Logging**: Fixed issue where settings changes weren't appearing in Stream Logs
+- **Upload Logging**: Fixed missing upload events in Stream Logs
+- **Import Errors**: Resolved module import issues that were causing API failures
+- **Log Persistence**: Fixed logs not persisting between API calls
+
+### Reasoning
+
+- **User Request**: Direct response to reported logging issues
+- **System Transparency**: Better visibility into system operations
+- **Debugging**: Easier troubleshooting and monitoring
+- **Reliability**: More robust logging system that doesn't fail
+- **User Experience**: Immediate feedback for all user actions
