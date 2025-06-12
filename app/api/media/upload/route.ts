@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import logger from "@/lib/logger"
+import { uploadMediaFiles } from "@/lib/media-manager"
+import { saveMediaSelection, getMediaSelection } from "@/lib/media-manager"
 
 export async function POST(request: Request) {
   try {
@@ -16,30 +18,38 @@ export async function POST(request: Request) {
     // Log the upload attempt
     logger.addLog(`Upload started: ${files.length} ${type} file(s)`)
 
-    // Add a small delay to simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Mock response
-    const mockFiles = files.map((file) => ({
-      name: file.name,
-      path: `/media/${type}/${file.name}`,
-      selected: true, // Mark as selected by default
-    }))
+    // Actually upload the files using the media-manager
+    const uploadedFiles = await uploadMediaFiles(files, type)
 
     // Log successful upload with file names
     const fileNames = files.map((f) => f.name).join(", ")
     logger.addLog(`Upload completed: ${files.length} ${type} file(s) - ${fileNames}`)
 
-    // Log auto-selection
-    if (type === "video") {
-      logger.addLog(`Auto-selected video: ${files[0].name}`)
-    } else {
+    // Auto-select the uploaded files
+    const currentSelection = await getMediaSelection()
+    
+    if (type === "video" && uploadedFiles.length > 0) {
+      // Auto-select the first video
+      const newVideo = uploadedFiles[0].path
+      logger.addLog(`Auto-selected video: ${uploadedFiles[0].name}`)
+      
+      // Save the selection
+      await saveMediaSelection(newVideo, currentSelection.audioPlaylist || [])
+    } else if (type === "audio" && uploadedFiles.length > 0) {
+      // Add all audio files to playlist
+      const newPlaylist = [
+        ...(currentSelection.audioPlaylist || []),
+        ...uploadedFiles.map(file => file.path)
+      ]
       logger.addLog(`Auto-added ${files.length} audio file(s) to playlist`)
+      
+      // Save the selection
+      await saveMediaSelection(currentSelection.video, newPlaylist)
     }
 
     return NextResponse.json({
       message: `${files.length} files uploaded successfully`,
-      files: mockFiles,
+      files: uploadedFiles,
     })
   } catch (error: any) {
     console.error("Error uploading files:", error)

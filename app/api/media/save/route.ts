@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import logger from "@/lib/logger"
+import { saveMediaSelection } from "@/lib/media-manager"
 
 export async function POST(request: Request) {
   try {
     const { video, audioPlaylist, videoLooping } = await request.json()
 
     console.log("Media selection saved:", { video, audioPlaylist, videoLooping })
+
+    // Actually save the media selection
+    await saveMediaSelection(video, audioPlaylist)
 
     // Create detailed log message
     let logMessage = "Media selection updated: "

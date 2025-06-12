@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
 import logger from "@/lib/logger"
+import { stopStream } from "@/lib/stream-engine"
 
 export async function POST(request: Request) {
   try {
     console.log("Stream stop requested")
     logger.addLog("Stream stop requested")
 
-    // Add a small delay to simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Actually stop the stream using the stream-engine
+    await stopStream()
 
     logger.addLog("Stream stopped successfully")
 

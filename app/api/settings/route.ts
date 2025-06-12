@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import logger from "@/lib/logger"
+import { getStreamSettings, saveStreamSettings } from "@/lib/settings-manager"
 
 // Mock settings
 const mockSettings = {
@@ -14,7 +15,9 @@ const mockSettings = {
 
 export async function GET() {
   try {
-    return NextResponse.json(mockSettings)
+    // Get actual settings from the settings manager
+    const settings = await getStreamSettings()
+    return NextResponse.json(settings)
   } catch (error: any) {
     console.error("Error fetching stream settings:", error)
     return NextResponse.json(
@@ -33,6 +36,9 @@ export async function POST(request: Request) {
     const { changes, ...settings } = data
 
     console.log("Settings saved:", settings)
+
+    // Actually save the settings
+    await saveStreamSettings(settings)
 
     // Log changes to stream logs
     if (changes && changes.length > 0) {

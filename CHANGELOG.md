@@ -417,3 +417,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Debugging**: Easier troubleshooting and monitoring
 - **Reliability**: More robust logging system that doesn't fail
 - **User Experience**: Immediate feedback for all user actions
+
+## 2025-06-12
+
+### Major Functionality Improvements
+
+- **Fixed API Persistence**: Updated API endpoints to properly save and retrieve data
+  - Media uploads now persist between page refreshes
+  - Settings are properly saved and retrieved
+  - Stream status is correctly maintained between tab changes
+
+- **Stream Engine Enhancements**:
+  - Implemented proper FFmpeg process management
+  - Fixed stream stopping functionality to reliably terminate FFmpeg processes
+  - Added multiple fallback mechanisms for process termination
+  - Improved audio playlist handling for continuous playback
+  - Implemented Constant Bit Rate (CBR) streaming for better stability
+
+- **Audio Streaming Improvements**:
+  - Fixed silent stream issue by properly configuring audio inputs
+  - Implemented proper audio playlist looping
+  - Added explicit stream mapping for video and audio
+  - Enhanced audio settings with stereo output
+  - Fixed audio looping issue where audio would repeat every few seconds
+  - Fixed invalid data error in audio playlist format
+  - Added audio synchronization with "-async 1" flag
+  - Removed problematic duration metadata that was causing stream failures
+
+- **Error Handling**:
+  - Added graceful error handling for stream operations
+  - Improved logging for better debugging
+  - Fixed process termination issues
+
+### Technical Improvements
+
+- **FFmpeg Configuration**:
+  - Switched from Variable Bit Rate (VBR) to Constant Bit Rate (CBR)
+  - Added `-minrate` equal to target bitrate for stability
+  - Set `-maxrate` equal to target bitrate to prevent fluctuations
+  - Added `-tune zerolatency` for reduced latency
+  - Added `-profile:v main` and `-level 4.1` for better compatibility
+  - Implemented proper audio channel configuration with `-ac 2`
+
+- **Process Management**:
+  - Added external FFmpeg process detection and termination
+  - Improved process monitoring and cleanup
+  - Added fallback timeout mechanisms for reliable termination
+  - Enhanced logging of process states and operations
+
+- **File Path Handling**:
+  - Fixed file path issues in media manager
+  - Improved path escaping for FFmpeg compatibility
+  - Added detailed logging of file paths for debugging
+
+### Bug Fixes
+
+- **Stream Control**:
+  - Fixed issue where FFmpeg processes would continue running after stop
+  - Fixed stream status not persisting between tab changes
+  - Added proper state handling in StreamControl component
+
+- **Media Management**:
+  - Fixed media list endpoint to show actual uploaded files
+  - Corrected file path handling in media uploads
+  - Fixed media selection persistence between page refreshes
+
+- **Audio Playback**:
+  - Fixed silent stream issue by properly configuring audio inputs
+  - Corrected audio playlist format for FFmpeg compatibility
+  - Added proper stream mapping for audio tracks
+
+### Files Modified
+
+- `app/api/media/list/route.ts` - Updated to fetch actual media files
+- `app/api/media/upload/route.ts` - Fixed to properly save uploaded files
+- `app/api/media/save/route.ts` - Enhanced to save media selection
+- `app/api/settings/route.ts` - Updated to save and retrieve actual settings
+- `app/api/stream/status/route.ts` - Modified to use actual stream status
+- `app/api/stream/start/route.ts` - Updated to actually start the stream
+- `app/api/stream/stop/route.ts` - Enhanced to properly stop the stream
+- `app/api/stream/restart/route.ts` - Fixed to properly restart the stream
+- `lib/stream-engine.ts` - Major improvements to FFmpeg handling and process management
+- `lib/media-manager.ts` - Fixed file path handling and selection persistence
+- `components/stream-control.tsx` - Added proper state handling for stream status

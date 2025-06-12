@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server"
 import logger from "@/lib/logger"
+import { restartStream } from "@/lib/stream-engine"
 
 export async function POST(request: Request) {
   try {
     console.log("Stream restart requested")
     logger.addLog("Stream restart requested")
 
-    // Add a small delay to simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Actually restart the stream using the stream-engine
+    const result = await restartStream()
 
     logger.addLog("Stream restarted successfully")
 
     return NextResponse.json({
       message: "Stream restarted successfully",
-      pid: Math.floor(Math.random() * 10000),
+      pid: result.pid,
       status: "streaming",
     })
   } catch (error: any) {

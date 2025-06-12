@@ -26,6 +26,7 @@ if (!fs.existsSync(path.join(process.cwd(), "config"))) {
 const defaultMediaConfig = {
   video: null,
   audioPlaylist: [],
+  videoLooping: true,
 }
 
 // Function to get media files
@@ -65,7 +66,7 @@ export async function getMediaFiles() {
     }
   }
 
-  audioPlaylist.forEach((audioPath) => {
+  audioPlaylist.forEach((audioPath: string) => {
     const selectedAudio = audioFiles.find((file) => file.path === audioPath)
     if (selectedAudio) {
       selectedAudio.selected = true
@@ -86,7 +87,8 @@ export async function getMediaSelection() {
 
   try {
     const configData = fs.readFileSync(CONFIG_FILE, "utf-8")
-    return JSON.parse(configData)
+    const config = JSON.parse(configData)
+    return { ...defaultMediaConfig, ...config }
   } catch (error) {
     console.error("Error reading media config:", error)
     return defaultMediaConfig
@@ -95,21 +97,25 @@ export async function getMediaSelection() {
 
 // Function to save media selection
 export async function saveMediaSelection(video: string | null, audioPlaylist: string[]) {
-  // Validate video file exists
+  // Get current selection to preserve videoLooping setting
+  const currentConfig = await getMediaSelection()
+
+  // Validate video file exists if provided
   if (video && !fs.existsSync(video)) {
-    throw new Error(`Video file not found: ${video}`)
+    console.warn(`Video file not found: ${video}`)
   }
 
   // Validate audio files exist
   for (const audioFile of audioPlaylist) {
     if (!fs.existsSync(audioFile)) {
-      throw new Error(`Audio file not found: ${audioFile}`)
+      console.warn(`Audio file not found: ${audioFile}`)
     }
   }
 
   const mediaConfig = {
     video,
     audioPlaylist,
+    videoLooping: currentConfig.videoLooping,
   }
 
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(mediaConfig, null, 2))

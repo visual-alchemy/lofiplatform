@@ -73,10 +73,38 @@ export async function getStreamLogs() {
   return logLines.slice(-LOG_MAX_LINES)
 }
 
+// Function to create a temporary audio playlist file
+function createAudioPlaylist(audioFiles: string[]) {
+  const playlistPath = path.join(process.cwd(), "temp", "audio_playlist.txt")
+
+  // Ensure temp directory exists
+  if (!fs.existsSync(path.join(process.cwd(), "temp"))) {
+    fs.mkdirSync(path.join(process.cwd(), "temp"), { recursive: true })
+  }
+
+  // Create playlist file content for FFmpeg concat demuxer
+  let playlistContent = "";
+  
+  // Add each file with proper format for FFmpeg concat demuxer
+  audioFiles.forEach(file => {
+    // Ensure the file path is properly escaped for FFmpeg
+    const escapedPath = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    
+    // Simple format without duration line which was causing errors
+    playlistContent += `file '${escapedPath}'\n`;
+  });
+  
+  fs.writeFileSync(playlistPath, playlistContent);
+  logMessage(`Created audio playlist with ${audioFiles.length} files at ${playlistPath}`);
+  logMessage(`Playlist content: \n${playlistContent}`);
+
+  return playlistPath;
+}
+
 // Function to build FFmpeg command
 async function buildFFmpegCommand() {
   const settings = await getStreamSettings()
-  const { video, audioPlaylist } = await getMediaSelection()
+  const { video, audioPlaylist, videoLooping } = await getMediaSelection()
 
   if (!video || audioPlaylist.length === 0) {
     throw new Error("No video or audio files selected")
@@ -87,35 +115,51 @@ async function buildFFmpegCommand() {
   }
 
   const [width, height] = settings.resolution.split("x")
+  
+  // Create the audio playlist file
+  const audioPlaylistFile = createAudioPlaylist(audioPlaylist)
+  
+  // Log the full paths for debugging
+  logMessage(`Video file: ${video}`)
+  audioPlaylist.forEach((audio: string, index: number) => {
+    logMessage(`Audio file ${index + 1}: ${audio}`)
+  })
 
   // Build FFmpeg command
   const args = [
-    // Input video file (looped)
-    "-stream_loop",
-    "-1",
+    // Input video file (looped if enabled)
+    ...(videoLooping ? ["-stream_loop", "-1"] : []),
     "-re",
     "-i",
     video,
 
-    // Input audio files (playlist)
+    // Input audio files (playlist with loop)
     "-f",
     "concat",
     "-safe",
     "0",
+    "-stream_loop", 
+    "-1",  // Loop the audio playlist indefinitely
     "-i",
-    createAudioPlaylist(audioPlaylist),
+    audioPlaylistFile,
 
-    // Video settings
+    // Map both video and audio
+    "-map", "0:v", // Map video from first input
+    "-map", "1:a", // Map audio from second input
+
+    // Video settings for CBR (Constant Bit Rate)
     "-c:v",
     "libx264",
     "-preset",
     "veryfast",
     "-b:v",
     `${settings.videoBitrate}k`,
+    "-minrate", 
+    `${settings.videoBitrate}k`,
     "-maxrate",
-    `${settings.videoBitrate * 1.5}k`,
+    `${settings.videoBitrate}k`,
     "-bufsize",
-    `${settings.videoBitrate * 3}k`,
+    `${settings.videoBitrate * 2}k`,
     "-vf",
     `scale=${width}:${height}`,
     "-r",
@@ -124,8 +168,14 @@ async function buildFFmpegCommand() {
     (settings.fps * 2).toString(),
     "-pix_fmt",
     "yuv420p",
+    "-tune", 
+    "zerolatency",
+    "-profile:v",
+    "main",
+    "-level",
+    "4.1",
 
-    // Audio settings
+    // Audio settings - also using CBR for audio
     "-c:a",
     "aac",
     "-b:a",
@@ -134,7 +184,13 @@ async function buildFFmpegCommand() {
     "44100",
     "-af",
     `volume=${settings.audioVolume}`,
-
+    "-ac",
+    "2",  // Stereo audio
+    
+    // Ensure audio is properly handled
+    "-async", 
+    "1",  // Audio sync method
+    
     // Output settings
     "-f",
     "flv",
@@ -154,23 +210,6 @@ async function buildFFmpegCommand() {
   ]
 
   return args
-}
-
-// Function to create a temporary audio playlist file
-function createAudioPlaylist(audioFiles: string[]) {
-  const playlistPath = path.join(process.cwd(), "temp", "audio_playlist.txt")
-
-  // Ensure temp directory exists
-  if (!fs.existsSync(path.join(process.cwd(), "temp"))) {
-    fs.mkdirSync(path.join(process.cwd(), "temp"), { recursive: true })
-  }
-
-  // Create playlist file content
-  const playlistContent = audioFiles.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n")
-
-  fs.writeFileSync(playlistPath, playlistContent)
-
-  return playlistPath
 }
 
 // Function to start the stream
@@ -247,39 +286,92 @@ export async function startStream() {
 
 // Function to stop the stream
 export async function stopStream() {
+  logMessage("Stream stop requested")
+  
+  // Try to find and kill any running FFmpeg processes even if our ffmpegProcess is null
+  try {
+    // On Unix-like systems (Mac, Linux), try to kill FFmpeg processes
+    const { exec } = require('child_process');
+    exec('pkill -f ffmpeg', (error: Error | null, stdout: string, stderr: string) => {
+      if (error) {
+        logMessage(`No external FFmpeg processes found or could not kill: ${error.message}`);
+      } else {
+        logMessage("Killed external FFmpeg processes");
+      }
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    logMessage(`Error trying to kill external FFmpeg processes: ${error.message}`);
+  }
+  
+  // Handle our tracked FFmpeg process
   if (!ffmpegProcess) {
-    throw new Error("Stream is not running")
+    logMessage("Stream is not running, nothing to stop");
+    return { success: true, message: "Stream was not running" };
   }
 
   return new Promise<void>((resolve, reject) => {
-    logMessage("Stopping stream")
-
-    // Send SIGTERM to gracefully stop FFmpeg
-    ffmpegProcess?.kill("SIGTERM")
-
-    // Set a timeout to force kill if it doesn't exit gracefully
-    const timeout = setTimeout(() => {
+    logMessage("Stopping tracked FFmpeg process");
+    
+    // Try SIGKILL directly instead of SIGTERM for more reliable termination
+    try {
       if (ffmpegProcess) {
-        logMessage("Force killing FFmpeg process")
-        ffmpegProcess.kill("SIGKILL")
+        ffmpegProcess.kill('SIGKILL');
+        logMessage("SIGKILL sent to FFmpeg process");
       }
-    }, 5000)
+    } catch (err: unknown) {
+      const error = err as Error;
+      logMessage(`Error sending SIGKILL: ${error.message}`);
+    }
+
+    // Set a timeout to check if process is still running
+    const timeout = setTimeout(() => {
+      if (ffmpegProcess && ffmpegProcess.pid) {
+        try {
+          // Try again with process.kill
+          process.kill(ffmpegProcess.pid, 'SIGKILL');
+          logMessage("Force killed FFmpeg process with process.kill");
+        } catch (err: unknown) {
+          const error = err as Error;
+          logMessage(`Could not force kill: ${error.message}`);
+        }
+      }
+    }, 1000);
 
     // Handle process exit
-    ffmpegProcess?.on("exit", () => {
-      clearTimeout(timeout)
-      ffmpegProcess = null
-      streamStartTime = null
-      logMessage("Stream stopped successfully")
-      resolve()
-    })
+    if (ffmpegProcess) {
+      ffmpegProcess.on("exit", () => {
+        clearTimeout(timeout);
+        ffmpegProcess = null;
+        streamStartTime = null;
+        logMessage("Stream stopped successfully");
+        resolve();
+      });
 
-    ffmpegProcess?.on("error", (err) => {
-      clearTimeout(timeout)
-      logMessage(`Error stopping stream: ${err.message}`)
-      reject(err)
-    })
-  })
+      ffmpegProcess.on("error", (err) => {
+        clearTimeout(timeout);
+        logMessage(`Error stopping stream: ${err.message}`);
+        
+        // Still consider the stream stopped even if there was an error
+        ffmpegProcess = null;
+        streamStartTime = null;
+        resolve();
+      });
+    } else {
+      clearTimeout(timeout);
+      resolve();
+    }
+    
+    // Add a fallback to resolve the promise after a timeout
+    setTimeout(() => {
+      if (ffmpegProcess) {
+        ffmpegProcess = null;
+        streamStartTime = null;
+        logMessage("Stream stop timed out, but considering it stopped");
+      }
+      resolve();
+    }, 3000);
+  });
 }
 
 // Function to restart the stream

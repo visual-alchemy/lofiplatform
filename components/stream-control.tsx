@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Play, Square, RefreshCw, Loader2 } from "lucide-react"
@@ -15,6 +15,11 @@ export function StreamControl({ status: initialStatus }: StreamControlProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState(initialStatus)
   const router = useRouter()
+  
+  // Update local status when prop changes
+  useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
 
   const handleStreamAction = async (action: "start" | "stop" | "restart") => {
     setIsLoading(true)
