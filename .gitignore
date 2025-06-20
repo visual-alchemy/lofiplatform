@@ -1,0 +1,14 @@
+
+# Build files
+.next/
+node_modules/
+package-lock.json
+next-env.d.ts
+
+# Logs and temp files
+logs/
+temp/
+
+# Media files
+media/
+config/

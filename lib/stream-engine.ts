@@ -8,9 +8,14 @@ import { getMediaSelection } from "./media-manager"
 let ffmpegProcess: ChildProcess | null = null
 let streamStartTime: Date | null = null
 let lastReconnectTime: Date | null = null
+let currentPlayingFile: string = "None"
+let currentPlayingIndex: number = 0
+let selectedAudioFiles: string[] = []
+let audioPlaybackStartTime: Date | null = null
 const streamStats = {
   fps: "0",
   bitrate: "0 kbps",
+  currentTrack: "None",
 }
 
 // Path to log file
@@ -49,6 +54,14 @@ export async function getStreamStatus() {
 
   const lastReconnect = lastReconnectTime ? lastReconnectTime.toLocaleString() : "Never"
 
+  // Make sure we have a valid current track if we're streaming
+  if (isStreaming && selectedAudioFiles.length > 0 && 
+      (streamStats.currentTrack === "None" || streamStats.currentTrack === "")) {
+    const firstTrack = path.basename(selectedAudioFiles[0]);
+    streamStats.currentTrack = firstTrack.replace(".mp3", "");
+    logMessage(`Correcting current track in status to: ${streamStats.currentTrack}`);
+  }
+
   return {
     status: isStreaming ? "streaming" : "idle",
     stats: {
@@ -56,6 +69,7 @@ export async function getStreamStatus() {
       fps: streamStats.fps,
       bitrate: streamStats.bitrate,
       lastReconnect,
+      currentTrack: streamStats.currentTrack,
     },
   }
 }
@@ -83,22 +97,17 @@ function createAudioPlaylist(audioFiles: string[]) {
   }
 
   // Create playlist file content for FFmpeg concat demuxer
-  // Using the proper format for FFmpeg concat demuxer to ensure all files play in sequence
   let playlistContent = "";
   
   // Add each file with proper format for FFmpeg concat demuxer
-  // The format is important to ensure all files are played in sequence
   audioFiles.forEach(file => {
-    // Ensure the file path is properly escaped for FFmpeg
-    const escapedPath = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    
-    // Simple format without duration line which was causing errors
-    playlistContent += `file '${escapedPath}'\n`;
+    // Format for FFmpeg concat demuxer
+    playlistContent += `file '${file}'\n`;
   });
   
   fs.writeFileSync(playlistPath, playlistContent);
   logMessage(`Created audio playlist with ${audioFiles.length} files at ${playlistPath}`);
-  logMessage(`Playlist content: \n${playlistContent}`);
+  logMessage(`Playlist content sample (first few entries): ${playlistContent.split('\n').slice(0, 5).join('\n')}...`);
 
   return playlistPath;
 }
@@ -122,15 +131,35 @@ async function buildFFmpegCommand() {
 
   const [width, height] = settings.resolution.split("x")
   
-  // Create the audio playlist file
-  const audioPlaylistFile = createAudioPlaylist(audioPlaylist)
+  // Filter out audio files with special characters
+  const filteredAudioPlaylist = audioPlaylist.filter((file: string) => !file.includes("'"));
+  logMessage(`Filtered out ${audioPlaylist.length - filteredAudioPlaylist.length} audio files with special characters`);
+  
+  if (filteredAudioPlaylist.length === 0) {
+    throw new Error("No valid audio files available after filtering");
+  }
+  
+  // Use all filtered audio files instead of limiting to just 5
+  selectedAudioFiles = filteredAudioPlaylist;
+  currentPlayingIndex = 0;
+  audioPlaybackStartTime = new Date();
+  
+  // Set initial track information
+  if (selectedAudioFiles.length > 0) {
+    const firstTrack = path.basename(selectedAudioFiles[0]);
+    streamStats.currentTrack = firstTrack.replace(".mp3", "");
+    currentPlayingFile = selectedAudioFiles[0];
+    logMessage(`Starting playback with track: ${streamStats.currentTrack}`);
+  }
   
   // Log the full paths for debugging
-  logMessage(`Video file: ${video}`)
-  audioPlaylist.forEach((audio: string, index: number) => {
-    logMessage(`Audio file ${index + 1}: ${audio}`)
-  })
-
+  logMessage(`Video file: ${video}`);
+  logMessage(`Selected ${selectedAudioFiles.length} audio files for playlist`);
+  logMessage(`Initial track: ${streamStats.currentTrack}`);
+  
+  // Create a playlist file for FFmpeg to use
+  const playlistPath = createAudioPlaylist(selectedAudioFiles);
+  
   // Build FFmpeg command
   const args = [
     // Input video file (looped if enabled)
@@ -138,21 +167,15 @@ async function buildFFmpegCommand() {
     "-re",
     "-i",
     video,
-
-    // Input audio files (playlist with loop)
-    // Using concat format to ensure all files in the playlist are played in sequence
-    "-f",
-    "concat",
-    "-safe",
-    "0",
-    "-stream_loop", 
-    "-1",  // Loop the entire audio playlist indefinitely
-    "-i",
-    audioPlaylistFile,
-
-    // Map both video and audio
+    
+    // Use the playlist file for audio input
+    "-f", "concat",
+    "-safe", "0",
+    "-i", playlistPath,
+    
+    // Map video from first input and audio from second input
     "-map", "0:v", // Map video from first input
-    "-map", "1:a", // Map audio from second input
+    "-map", "1:a", // Map audio from second input (playlist)
 
     // Video settings for CBR (Constant Bit Rate)
     "-c:v",
@@ -189,14 +212,15 @@ async function buildFFmpegCommand() {
     `${settings.audioBitrate}k`,
     "-ar",
     "44100",
-    "-af",
-    `volume=${settings.audioVolume}`,
     "-ac",
     "2",  // Stereo audio
     
     // Ensure audio is properly handled
     "-async", 
     "1",  // Audio sync method
+    
+    // Loop the output indefinitely
+    "-shortest",
     
     // Output settings
     "-f",
@@ -233,6 +257,22 @@ export async function startStream() {
 
     ffmpegProcess = spawn("ffmpeg", ffmpegArgs)
     streamStartTime = new Date()
+    
+    // Ensure we have the correct initial track set
+    if (selectedAudioFiles.length > 0) {
+      const firstTrack = path.basename(selectedAudioFiles[0]);
+      streamStats.currentTrack = firstTrack.replace(".mp3", "");
+      logMessage(`Setting initial track on stream start: ${streamStats.currentTrack}`);
+      
+      // Force the current track to be the first one in the playlist
+      setTimeout(() => {
+        if (selectedAudioFiles.length > 0) {
+          const firstTrack = path.basename(selectedAudioFiles[0]);
+          streamStats.currentTrack = firstTrack.replace(".mp3", "");
+          logMessage(`Forcing initial track after delay: ${streamStats.currentTrack}`);
+        }
+      }, 2000);
+    }
 
     // Handle FFmpeg output
     ffmpegProcess.stdout?.on("data", (data) => {
@@ -262,6 +302,39 @@ export async function startStream() {
       if (output.includes("Reconnecting")) {
         lastReconnectTime = new Date()
         logMessage("Detected reconnection attempt")
+      }
+      
+      // Track current playing file
+      if (output.includes("mp3") && (output.includes("Opening") || output.includes("from"))) {
+        // Try different regex patterns to match FFmpeg's output formats
+        let fileMatch = output.match(/Opening '([^']+\.mp3)'/i) || 
+                       output.match(/from ['"]([^'"]+\.mp3)['"]/i) ||
+                       output.match(/Input #\d+, .+, from '([^']+\.mp3)'/i);
+        
+        if (fileMatch && fileMatch[1]) {
+          const fullPath = fileMatch[1];
+          const fileName = path.basename(fullPath);
+          
+          // We'll collect the detected files but only use them after initialization
+          // Store this detection for later use but don't update the current track yet
+          if (!output.includes("Input #")) {
+            // This is likely actual playback, not initialization
+            currentPlayingFile = fileName;
+            streamStats.currentTrack = fileName.replace(".mp3", "");
+            logMessage(`Now playing: ${streamStats.currentTrack}`);
+          }
+        }
+      }
+      
+      // Update current track based on time progress
+      if (output.includes("time=")) {
+        // This is a progress update, which confirms we're playing
+        // Make sure we have the correct track displayed
+        if (selectedAudioFiles.length > 0 && streamStats.currentTrack === "None") {
+          const firstTrack = path.basename(selectedAudioFiles[0]);
+          streamStats.currentTrack = firstTrack.replace(".mp3", "");
+          logMessage(`Setting initial track: ${streamStats.currentTrack}`);
+        }
       }
     })
 

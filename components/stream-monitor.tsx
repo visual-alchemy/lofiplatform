@@ -13,6 +13,7 @@ interface StreamMonitorProps {
     fps: string
     bitrate: string
     lastReconnect: string
+    currentTrack?: string
   }
 }
 
@@ -35,7 +36,8 @@ export function StreamMonitor({ status, stats }: StreamMonitorProps) {
       const data = await response.json()
 
       if (data.logs) {
-        setLogs(data.logs)
+        // Reverse the logs array to show newest logs at the top
+        setLogs([...data.logs].reverse())
       } else {
         // Handle case where logs property is missing
         setLogs([`[${new Date().toISOString()}] No logs available`])
@@ -99,6 +101,20 @@ export function StreamMonitor({ status, stats }: StreamMonitorProps) {
               </span>
               <span className="font-mono text-sm text-gray-900">{stats.lastReconnect}</span>
             </div>
+            
+            {/* Current Track - spans full width */}
+            <div className="flex flex-col space-y-1 col-span-2 mt-2 pt-2 border-t border-gray-200">
+              <span className="text-xs text-gray-500 flex items-center">
+                <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Now Playing
+              </span>
+              <span className="font-mono text-sm text-gray-900 truncate">
+                {status === "streaming" ? (stats.currentTrack || "No track info available") : "No track playing"}
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -107,7 +123,7 @@ export function StreamMonitor({ status, stats }: StreamMonitorProps) {
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-lg text-gray-900">Stream Logs</CardTitle>
-            <CardDescription className="text-gray-600">Recent activity</CardDescription>
+            <CardDescription className="text-gray-600">Recent activity (newest first)</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefreshLogs} disabled={isLoading} className="h-8 px-2">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
