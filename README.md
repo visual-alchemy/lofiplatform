@@ -113,7 +113,7 @@ cp your-audio.mp3 media/audio/
    npm run dev
    ```
 
-2. **Open the dashboard**: Navigate to `http://localhost:3000`
+2. **Open the dashboard**: Navigate to `http://localhost:3005`
 
 3. **Configure settings**:
    - Go to the **Settings** tab

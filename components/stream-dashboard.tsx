@@ -44,7 +44,7 @@ export function StreamDashboard() {
     fetchStatus()
 
     // Set up polling for stream status updates
-    const interval = setInterval(fetchStatus, 5000)
+    const interval = setInterval(fetchStatus, 2000)
 
     return () => clearInterval(interval)
   }, [])

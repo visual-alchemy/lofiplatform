@@ -12,6 +12,9 @@ let currentPlayingFile: string = "None"
 let currentPlayingIndex: number = 0
 let selectedAudioFiles: string[] = []
 let audioPlaybackStartTime: Date | null = null
+let trackUpdateInterval: NodeJS.Timeout | null = null
+let estimatedTrackDurations: Map<string, number> = new Map(); // Store track durations in seconds
+
 const streamStats = {
   fps: "0",
   bitrate: "0 kbps",
@@ -21,6 +24,9 @@ const streamStats = {
 // Path to log file
 const LOG_FILE = path.join(process.cwd(), "logs", "stream.log")
 const LOG_MAX_LINES = 100
+
+// Average duration for lo-fi tracks (in seconds) if we can't determine actual duration
+const DEFAULT_TRACK_DURATION = 180; // 3 minutes
 
 // Ensure logs directory exists
 if (!fs.existsSync(path.join(process.cwd(), "logs"))) {
@@ -36,6 +42,47 @@ function logMessage(message: string) {
   fs.appendFileSync(LOG_FILE, logEntry + "\n")
 
   console.log(logEntry)
+}
+
+// Function to update the current track based on elapsed time
+function updateCurrentTrackBasedOnTime() {
+  if (!audioPlaybackStartTime || selectedAudioFiles.length === 0 || !ffmpegProcess) {
+    return;
+  }
+
+  const elapsedSeconds = Math.floor((Date.now() - audioPlaybackStartTime.getTime()) / 1000);
+  let totalDuration = 0;
+  let trackIndex = 0;
+
+  // Find which track should be playing based on elapsed time
+  for (let i = 0; i < selectedAudioFiles.length; i++) {
+    const file = selectedAudioFiles[i];
+    const fileName = path.basename(file);
+    const duration = estimatedTrackDurations.get(fileName) || DEFAULT_TRACK_DURATION;
+    
+    if (totalDuration + duration > elapsedSeconds) {
+      trackIndex = i;
+      break;
+    }
+    
+    totalDuration += duration;
+    
+    // If we've gone through all tracks, loop back to the beginning
+    if (i === selectedAudioFiles.length - 1) {
+      audioPlaybackStartTime = new Date(Date.now() - (elapsedSeconds - totalDuration) * 1000);
+      totalDuration = 0;
+      i = -1; // Will become 0 after increment
+    }
+  }
+
+  // Update current track if it has changed
+  if (trackIndex !== currentPlayingIndex) {
+    currentPlayingIndex = trackIndex;
+    const fileName = path.basename(selectedAudioFiles[currentPlayingIndex]);
+    currentPlayingFile = fileName;
+    streamStats.currentTrack = fileName.replace(".mp3", "");
+    logMessage(`Track changed to: ${streamStats.currentTrack}`);
+  }
 }
 
 // Function to get stream status
@@ -60,6 +107,11 @@ export async function getStreamStatus() {
     const firstTrack = path.basename(selectedAudioFiles[0]);
     streamStats.currentTrack = firstTrack.replace(".mp3", "");
     logMessage(`Correcting current track in status to: ${streamStats.currentTrack}`);
+  }
+  
+  // Update the current track based on time if we're streaming
+  if (isStreaming) {
+    updateCurrentTrackBasedOnTime();
   }
 
   return {
@@ -257,22 +309,24 @@ export async function startStream() {
 
     ffmpegProcess = spawn("ffmpeg", ffmpegArgs)
     streamStartTime = new Date()
+    audioPlaybackStartTime = new Date()
     
     // Ensure we have the correct initial track set
     if (selectedAudioFiles.length > 0) {
       const firstTrack = path.basename(selectedAudioFiles[0]);
       streamStats.currentTrack = firstTrack.replace(".mp3", "");
+      currentPlayingIndex = 0;
       logMessage(`Setting initial track on stream start: ${streamStats.currentTrack}`);
-      
-      // Force the current track to be the first one in the playlist
-      setTimeout(() => {
-        if (selectedAudioFiles.length > 0) {
-          const firstTrack = path.basename(selectedAudioFiles[0]);
-          streamStats.currentTrack = firstTrack.replace(".mp3", "");
-          logMessage(`Forcing initial track after delay: ${streamStats.currentTrack}`);
-        }
-      }, 2000);
     }
+    
+    // Start a timer to update the current track based on time
+    if (trackUpdateInterval) {
+      clearInterval(trackUpdateInterval);
+    }
+    
+    trackUpdateInterval = setInterval(() => {
+      updateCurrentTrackBasedOnTime();
+    }, 5000); // Check every 5 seconds
 
     // Handle FFmpeg output
     ffmpegProcess.stdout?.on("data", (data) => {
@@ -388,6 +442,12 @@ export async function stopStream() {
   if (!ffmpegProcess) {
     logMessage("Stream is not running, nothing to stop");
     return { success: true, message: "Stream was not running" };
+  }
+
+  // Clear the track update interval
+  if (trackUpdateInterval) {
+    clearInterval(trackUpdateInterval);
+    trackUpdateInterval = null;
   }
 
   return new Promise<void>((resolve, reject) => {
